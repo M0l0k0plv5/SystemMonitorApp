@@ -55,8 +55,5 @@ Pull requests are welcome! Please open an issue first to discuss any major chang
 
 MIT License. See [LICENSE](LICENSE) for details.
 
----
-
-**Enjoy monitoring your Mac!**
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
