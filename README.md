@@ -59,3 +59,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 **Enjoy monitoring your Mac!**
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
