@@ -1,10 +1,9 @@
 import SwiftUI
-import Foundation
 
 struct ContentView: View {
     @State private var cpuCores: Int = 0
-    @State private var freeMemory: Double = 0.0 // in MB
-    @State private var totalMemory: Double = 0.0 // in MB
+    @State private var freeMemory: Double = 0.0
+    @State private var totalMemory: Double = 0.0
     @State private var osName: String = ""
     @State private var uptime: Int = 0
     @State private var cpuUsage: [Double] = Array(repeating: 0.0, count: 20)
@@ -14,8 +13,9 @@ struct ContentView: View {
     @State private var totalDiskSpace: Double = 0.0
     @State private var usedDiskSpace: Double = 0.0
     @State private var freeDiskSpace: Double = 0.0
+    @State private var showSettings = false
 
-    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect() // 4 seconds
 
     var formattedUptime: String {
         let hours = uptime / 3600
@@ -28,7 +28,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomTrailing) {
             VisualEffectBlur()
                 .ignoresSafeArea()
 
@@ -98,6 +98,24 @@ struct ContentView: View {
                 .font(.system(.body, design: .rounded))
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
+            }
+
+            // Settings Button (bottom right)
+            Button(action: { showSettings = true }) {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 20)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.15))
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.trailing, 24)
+            .padding(.bottom, 24)
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
         }
         .onAppear {
