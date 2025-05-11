@@ -1,5 +1,6 @@
 import SwiftUI
 import Darwin
+import Combine
 
 struct ContentView: View {
     @State private var cpuCores: Int = 0
@@ -15,12 +16,15 @@ struct ContentView: View {
     @State private var usedDiskSpace: Double = 0.0
     @State private var freeDiskSpace: Double = 0.0
     @State private var showSettings = false
+    @AppStorage("updateInterval") private var updateInterval: Double = UpdateInterval.normal.rawValue
     
     // CPU usage tracking
     @State private var previousTotalTicks: UInt64 = 0
     @State private var previousIdleTicks: UInt64 = 0
 
-    private let timer = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect() // 4 seconds
+    private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
+        Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
+    }
 
     var formattedUptime: String {
         let hours = uptime / 3600
@@ -40,35 +44,127 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 // Left Section: System Info
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("System Info")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .padding(.top)
+                    HStack {
+                        Text("System Info")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .padding(.top)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        // Settings Button moved here
+                        Button(action: { showSettings = true }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                Text("Settings")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                            }
+                            .foregroundColor(.primary)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color(.windowBackgroundColor).opacity(0.5))
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.horizontal)
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("CPU Info").font(.headline)
-                        Text("Cores: \(cpuCores)")
-                        Text("Architecture: \(cpuArchitecture)")
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Memory Info").font(.headline)
-                        Text("Free Memory: \(Int(ceil(freeMemory / 1024))) GB")
-                        Text("Total Memory: \(Int(ceil(totalMemory / 1024))) GB")
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Disk Info").font(.headline)
-                        Text("Total Disk Space: \(totalDiskSpace, specifier: "%.2f") GB")
-                        Text("Used Disk Space: \(usedDiskSpace, specifier: "%.2f") GB")
-                        Text("Free Disk Space: \(freeDiskSpace, specifier: "%.2f") GB")
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("System Info").font(.headline)
-                        Text("Model: \(systemModel)")
-                        Text("OS: \(osName)")
-                        Text("Boot Time: \(bootTime)")
-                        Text("Uptime: \(formattedUptime)")
+                    Group {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("CPU Info").font(.headline)
+                            HStack {
+                                Image(systemName: "cpu")
+                                    .foregroundColor(.blue)
+                                Text("Cores: \(cpuCores)")
+                            }
+                            HStack {
+                                Image(systemName: "memorychip")
+                                    .foregroundColor(.blue)
+                                Text("Architecture: \(cpuArchitecture)")
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.windowBackgroundColor).opacity(0.5))
+                        .cornerRadius(10)
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Memory Info").font(.headline)
+                            HStack {
+                                Image(systemName: "memorychip")
+                                    .foregroundColor(.green)
+                                Text("Free Memory: \(Int(ceil(freeMemory / 1024))) GB")
+                            }
+                            HStack {
+                                Image(systemName: "memorychip.fill")
+                                    .foregroundColor(.green)
+                                Text("Total Memory: \(Int(ceil(totalMemory / 1024))) GB")
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.windowBackgroundColor).opacity(0.5))
+                        .cornerRadius(10)
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Disk Info").font(.headline)
+                            HStack {
+                                Image(systemName: "externaldrive")
+                                    .foregroundColor(.orange)
+                                Text("Total: \(totalDiskSpace, specifier: "%.2f") GB")
+                            }
+                            HStack {
+                                Image(systemName: "externaldrive.fill")
+                                    .foregroundColor(.orange)
+                                Text("Used: \(usedDiskSpace, specifier: "%.2f") GB")
+                            }
+                            HStack {
+                                Image(systemName: "externaldrive.badge.checkmark")
+                                    .foregroundColor(.orange)
+                                Text("Free: \(freeDiskSpace, specifier: "%.2f") GB")
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.windowBackgroundColor).opacity(0.5))
+                        .cornerRadius(10)
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("System Info").font(.headline)
+                            HStack {
+                                Image(systemName: "desktopcomputer")
+                                    .foregroundColor(.purple)
+                                Text("Model: \(systemModel)")
+                            }
+                            HStack {
+                                Image(systemName: "apple.logo")
+                                    .foregroundColor(.purple)
+                                Text("OS: \(osName)")
+                            }
+                            HStack {
+                                Image(systemName: "clock")
+                                    .foregroundColor(.purple)
+                                Text("Boot Time: \(bootTime)")
+                            }
+                            HStack {
+                                Image(systemName: "timer")
+                                    .foregroundColor(.purple)
+                                Text("Uptime: \(formattedUptime)")
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.windowBackgroundColor).opacity(0.5))
+                        .cornerRadius(10)
                     }
                     Spacer()
                 }
@@ -84,6 +180,7 @@ struct ContentView: View {
                         Text("CPU Utilization")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .padding(.top)
+                            .foregroundColor(.primary)
                         if let currentCPU = cpuUsage.last {
                             Text("\(Int(currentCPU))%")
                                 .font(.system(size: 36, weight: .bold, design: .rounded))
@@ -96,32 +193,21 @@ struct ContentView: View {
                         LineChartView(cpuUsage: cpuUsage)
                             .frame(height: 200)
                             .padding()
+                            .background(Color(.windowBackgroundColor).opacity(0.5))
+                            .cornerRadius(15)
                     }
                     ActiveProcessesView()
+                        .background(Color(.windowBackgroundColor).opacity(0.5))
+                        .cornerRadius(15)
                     Spacer()
                 }
                 .font(.system(.body, design: .rounded))
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding()
             }
-
-            // Settings Button (bottom right)
-            Button(action: { showSettings = true }) {
-                Label("Settings", systemImage: "gearshape")
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 20)
-                    .background(
-                        Capsule()
-                            .fill(Color.secondary.opacity(0.15))
-                    )
-            }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.trailing, 24)
-            .padding(.bottom, 24)
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
         .onAppear {
             fetchSystemInfo()

@@ -1,12 +1,21 @@
 import SwiftUI
 import AppKit
 import Darwin
+import Combine
+import UserNotifications
 
 struct ActiveProcessesView: View {
     @State private var searchQuery: String = ""
     @State private var sortOption: SortOption = .name
     @State private var activeProcesses: [ProcessDetails] = []
-    @State private var timer = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect()
+    @AppStorage("updateInterval") private var updateInterval: Double = UpdateInterval.normal.rawValue
+    @AppStorage("maxProcesses") private var maxProcesses: Int = 5
+    @AppStorage("notifyHighCPU") private var notifyHighCPU: Bool = false
+    @AppStorage("cpuThreshold") private var cpuThreshold: Double = 80
+
+    private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
+        Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
+    }
 
     enum SortOption: String, CaseIterable, Identifiable {
         case name = "Name"
@@ -44,7 +53,7 @@ struct ActiveProcessesView: View {
             .pickerStyle(SegmentedPickerStyle())
             .padding(.horizontal)
 
-            List(filteredProcesses.prefix(5), id: \.id) { process in
+            List(filteredProcesses.prefix(maxProcesses), id: \.id) { process in
                 HStack {
                     VStack(alignment: .leading) {
                         Text(process.name)
@@ -64,9 +73,18 @@ struct ActiveProcessesView: View {
         }
         .onAppear {
             fetchActiveProcesses()
+            requestNotificationPermission()
         }
         .onReceive(timer) { _ in
             fetchActiveProcesses()
+        }
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("Error requesting notification permission: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -81,19 +99,43 @@ struct ActiveProcessesView: View {
                 pid: Int(app.processIdentifier),
                 cpuUsage: cpuUsage
             ))
+            
+            // Check for high CPU notification
+            if notifyHighCPU && cpuUsage > cpuThreshold {
+                sendHighCPUNotification(process: app.localizedName ?? "Unknown", cpuUsage: cpuUsage)
+            }
         }
         
         self.activeProcesses = processes
     }
     
+    private func sendHighCPUNotification(process: String, cpuUsage: Double) {
+        let content = UNMutableNotificationContent()
+        content.title = "High CPU Usage"
+        content.body = "\(process) is using \(String(format: "%.1f", cpuUsage))% CPU"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error sending notification: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     private func getProcessCPUUsage(pid: pid_t) -> Double {
-        var taskInfo = task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<task_basic_info>.size / MemoryLayout<natural_t>.size)
+        var taskInfo = task_thread_times_info()
+        var count = mach_msg_type_number_t(MemoryLayout<task_thread_times_info>.size / MemoryLayout<natural_t>.size)
         
         let result = withUnsafeMutablePointer(to: &taskInfo) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 task_info(mach_task_self_,
-                         task_flavor_t(TASK_BASIC_INFO),
+                         task_flavor_t(TASK_THREAD_TIMES_INFO),
                          $0,
                          &count)
             }
@@ -102,7 +144,16 @@ struct ActiveProcessesView: View {
         if result == KERN_SUCCESS {
             let userTime = Double(taskInfo.user_time.seconds) + Double(taskInfo.user_time.microseconds) / 1_000_000.0
             let systemTime = Double(taskInfo.system_time.seconds) + Double(taskInfo.system_time.microseconds) / 1_000_000.0
-            return (userTime + systemTime) * 100.0
+            let totalTime = userTime + systemTime
+            
+            // Get the time interval since last update
+            let timeInterval = updateInterval
+            
+            // Calculate CPU usage as percentage
+            let cpuUsage = (totalTime / timeInterval) * 100.0
+            
+            // Cap at 100%
+            return min(cpuUsage, 100.0)
         }
         
         return 0.0
