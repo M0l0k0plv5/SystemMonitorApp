@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Darwin
 
 struct ActiveProcessesView: View {
     @State private var searchQuery: String = ""
@@ -10,6 +11,7 @@ struct ActiveProcessesView: View {
     enum SortOption: String, CaseIterable, Identifiable {
         case name = "Name"
         case pid = "PID"
+        case cpu = "CPU"
         var id: String { self.rawValue }
     }
 
@@ -22,6 +24,8 @@ struct ActiveProcessesView: View {
                     return $0.name.localizedCompare($1.name) == .orderedAscending
                 case .pid:
                     return $0.pid < $1.pid
+                case .cpu:
+                    return $0.cpuUsage > $1.cpuUsage
                 }
             }
     }
@@ -50,8 +54,8 @@ struct ActiveProcessesView: View {
                             .foregroundColor(.gray)
                     }
                     Spacer()
-                    Text("-")
-                        .foregroundColor(.gray)
+                    Text(String(format: "%.1f%%", process.cpuUsage))
+                        .foregroundColor(process.cpuUsage > 80 ? .red : .gray)
                 }
             }
             .listStyle(PlainListStyle())
@@ -68,15 +72,40 @@ struct ActiveProcessesView: View {
 
     private func fetchActiveProcesses() {
         let runningApps = NSWorkspace.shared.runningApplications
-        self.activeProcesses = runningApps
-            .filter { $0.processIdentifier != 0 && $0.localizedName != nil }
-            .map {
-                ProcessDetails(
-                    name: $0.localizedName ?? $0.bundleIdentifier ?? "Unknown",
-                    pid: Int($0.processIdentifier),
-                    cpuUsage: 0
-                )
+        var processes: [ProcessDetails] = []
+        
+        for app in runningApps where app.processIdentifier != 0 && app.localizedName != nil {
+            let cpuUsage = getProcessCPUUsage(pid: app.processIdentifier)
+            processes.append(ProcessDetails(
+                name: app.localizedName ?? app.bundleIdentifier ?? "Unknown",
+                pid: Int(app.processIdentifier),
+                cpuUsage: cpuUsage
+            ))
+        }
+        
+        self.activeProcesses = processes
+    }
+    
+    private func getProcessCPUUsage(pid: pid_t) -> Double {
+        var taskInfo = task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<task_basic_info>.size / MemoryLayout<natural_t>.size)
+        
+        let result = withUnsafeMutablePointer(to: &taskInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_,
+                         task_flavor_t(TASK_BASIC_INFO),
+                         $0,
+                         &count)
             }
+        }
+        
+        if result == KERN_SUCCESS {
+            let userTime = Double(taskInfo.user_time.seconds) + Double(taskInfo.user_time.microseconds) / 1_000_000.0
+            let systemTime = Double(taskInfo.system_time.seconds) + Double(taskInfo.system_time.microseconds) / 1_000_000.0
+            return (userTime + systemTime) * 100.0
+        }
+        
+        return 0.0
     }
 }
 

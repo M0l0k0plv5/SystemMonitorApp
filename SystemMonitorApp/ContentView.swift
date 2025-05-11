@@ -1,4 +1,5 @@
 import SwiftUI
+import Darwin
 
 struct ContentView: View {
     @State private var cpuCores: Int = 0
@@ -14,6 +15,10 @@ struct ContentView: View {
     @State private var usedDiskSpace: Double = 0.0
     @State private var freeDiskSpace: Double = 0.0
     @State private var showSettings = false
+    
+    // CPU usage tracking
+    @State private var previousTotalTicks: UInt64 = 0
+    @State private var previousIdleTicks: UInt64 = 0
 
     private let timer = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect() // 4 seconds
 
@@ -150,15 +155,53 @@ struct ContentView: View {
     }
 
     private func updateCPUUsage() {
-        let last = cpuUsage.last ?? 0
-        let alpha = 0.3
-        let newRandom = Double.random(in: 0...100)
-        let newValue = last * (1 - alpha) + newRandom * alpha
-        withAnimation(.easeInOut(duration: 1)) {
-            cpuUsage.append(newValue)
-            if cpuUsage.count > 20 {
-                cpuUsage.removeFirst()
+        var numCPUs: natural_t = 0
+        var numCpuInfo: mach_msg_type_number_t = 0
+        var cpuInfo: processor_info_array_t?
+        
+        let result = host_processor_info(mach_host_self(),
+                                       PROCESSOR_CPU_LOAD_INFO,
+                                       &numCPUs,
+                                       &cpuInfo,
+                                       &numCpuInfo)
+        
+        if result == KERN_SUCCESS, let cpuInfo = cpuInfo {
+            var totalTicks: UInt64 = 0
+            var idleTicks: UInt64 = 0
+            
+            let cpuLoadInfo = UnsafeMutableRawPointer(cpuInfo).bindMemory(to: processor_cpu_load_info.self, capacity: Int(numCPUs))
+            
+            for i in 0..<Int(numCPUs) {
+                let user = UInt64(cpuLoadInfo[i].cpu_ticks.0)
+                let system = UInt64(cpuLoadInfo[i].cpu_ticks.1)
+                let idle = UInt64(cpuLoadInfo[i].cpu_ticks.2)
+                
+                totalTicks += user + system + idle
+                idleTicks += idle
             }
+            
+            if previousTotalTicks > 0 {
+                let totalDiff = totalTicks - previousTotalTicks
+                let idleDiff = idleTicks - previousIdleTicks
+                
+                if totalDiff > 0 {
+                    let usage = 100.0 * (1.0 - Double(idleDiff) / Double(totalDiff))
+                    withAnimation(.easeInOut(duration: 1)) {
+                        cpuUsage.append(usage)
+                        if cpuUsage.count > 20 {
+                            cpuUsage.removeFirst()
+                        }
+                    }
+                }
+            }
+            
+            previousTotalTicks = totalTicks
+            previousIdleTicks = idleTicks
+            
+            // Free the CPU info
+            vm_deallocate(mach_task_self_,
+                         vm_address_t(bitPattern: cpuInfo),
+                         vm_size_t(UInt(numCpuInfo) * UInt(MemoryLayout<Int32>.stride)))
         }
     }
 
