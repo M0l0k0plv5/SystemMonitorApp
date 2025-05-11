@@ -329,13 +329,25 @@ func getMemoryInfo() -> (free: Double, total: Double) {
 }
 
 func getDiskSpace() -> (total: Double, free: Double, used: Double) {
-    if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: "/"),
-       let total = attrs[.systemSize] as? NSNumber,
-       let free = attrs[.systemFreeSize] as? NSNumber {
-        let totalGB = total.doubleValue / (1024 * 1024 * 1024)
-        let freeGB = free.doubleValue / (1024 * 1024 * 1024)
-        let usedGB = totalGB - freeGB
-        return (totalGB, freeGB, usedGB)
+    let fileManager = FileManager.default
+    let homeURL = fileManager.homeDirectoryForCurrentUser
+    
+    do {
+        let resourceValues = try homeURL.resourceValues(forKeys: [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey
+        ])
+        
+        if let total = resourceValues.volumeTotalCapacity,
+           let free = resourceValues.volumeAvailableCapacityForImportantUsage {
+            let totalGB = Double(total) / (1024 * 1024 * 1024)
+            let freeGB = Double(free) / (1024 * 1024 * 1024)
+            let usedGB = totalGB - freeGB
+            return (totalGB, freeGB, usedGB)
+        }
+    } catch {
+        print("Error getting disk space: \(error.localizedDescription)")
     }
+    
     return (0, 0, 0)
 }

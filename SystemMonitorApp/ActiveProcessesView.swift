@@ -2,7 +2,6 @@ import SwiftUI
 import AppKit
 import Darwin
 import Combine
-import UserNotifications
 
 struct ActiveProcessesView: View {
     @State private var searchQuery: String = ""
@@ -10,8 +9,6 @@ struct ActiveProcessesView: View {
     @State private var activeProcesses: [ProcessDetails] = []
     @AppStorage("updateInterval") private var updateInterval: Double = UpdateInterval.normal.rawValue
     @AppStorage("maxProcesses") private var maxProcesses: Int = 5
-    @AppStorage("notifyHighCPU") private var notifyHighCPU: Bool = false
-    @AppStorage("cpuThreshold") private var cpuThreshold: Double = 80
 
     private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
         Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
@@ -73,18 +70,9 @@ struct ActiveProcessesView: View {
         }
         .onAppear {
             fetchActiveProcesses()
-            requestNotificationPermission()
         }
         .onReceive(timer) { _ in
             fetchActiveProcesses()
-        }
-    }
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                print("Error requesting notification permission: \(error.localizedDescription)")
-            }
         }
     }
 
@@ -99,33 +87,9 @@ struct ActiveProcessesView: View {
                 pid: Int(app.processIdentifier),
                 cpuUsage: cpuUsage
             ))
-            
-            // Check for high CPU notification
-            if notifyHighCPU && cpuUsage > cpuThreshold {
-                sendHighCPUNotification(process: app.localizedName ?? "Unknown", cpuUsage: cpuUsage)
-            }
         }
         
         self.activeProcesses = processes
-    }
-    
-    private func sendHighCPUNotification(process: String, cpuUsage: Double) {
-        let content = UNMutableNotificationContent()
-        content.title = "High CPU Usage"
-        content.body = "\(process) is using \(String(format: "%.1f", cpuUsage))% CPU"
-        content.sound = .default
-        
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Error sending notification: \(error.localizedDescription)")
-            }
-        }
     }
     
     private func getProcessCPUUsage(pid: pid_t) -> Double {

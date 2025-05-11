@@ -29,8 +29,6 @@ struct SettingsView: View {
     @AppStorage("maxProcesses") private var maxProcesses: Int = 5
     @AppStorage("showGraphGrid") private var showGraphGrid: Bool = true
     @AppStorage("graphHeight") private var graphHeight: Double = 200
-    @AppStorage("notifyHighCPU") private var notifyHighCPU: Bool = false
-    @AppStorage("cpuThreshold") private var cpuThreshold: Double = 80
 
     private var currentUpdateInterval: UpdateInterval {
         get { UpdateInterval(rawValue: updateInterval) ?? .normal }
@@ -45,7 +43,6 @@ struct SettingsView: View {
                 UpdateIntervalSection(updateInterval: $updateInterval)
                 ProcessListSection(maxProcesses: $maxProcesses)
                 GraphSettingsSection(showGrid: $showGraphGrid, graphHeight: $graphHeight)
-                NotificationSection(notifyHighCPU: $notifyHighCPU, cpuThreshold: $cpuThreshold)
                 Spacer()
             }
             .padding(32)
@@ -218,58 +215,29 @@ struct GraphSettingsSection: View {
     }
 }
 
-struct NotificationSection: View {
-    @Binding var notifyHighCPU: Bool
-    @Binding var cpuThreshold: Double
-    
-    var body: some View {
-        SettingsSection(title: "Notifications", icon: "bell.fill", color: .red) {
-            VStack(alignment: .leading, spacing: 16) {
-                Toggle("Notify on High CPU", isOn: $notifyHighCPU)
-                    .font(.system(.body, design: .rounded))
-                
-                if notifyHighCPU {
-                    HStack {
-                        Text("CPU Threshold")
-                            .font(.system(.body, design: .rounded))
-                        Spacer()
-                        Slider(value: $cpuThreshold, in: 50...95, step: 5)
-                            .frame(width: 150)
-                        Text("\(Int(cpuThreshold))%")
-                            .font(.system(.body, design: .rounded))
-                            .frame(width: 50)
-                    }
-                }
-            }
-        }
-    }
-}
-
 struct SettingsSection<Content: View>: View {
     let title: String
     let icon: String
     let color: Color
     let content: Content
-
+    
     init(title: String, icon: String, color: Color, @ViewBuilder content: () -> Content) {
         self.title = title
         self.icon = icon
         self.color = color
         self.content = content()
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.system(.headline, design: .rounded))
             }
-            
             content
         }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 24)
+        .padding(.vertical, 16)
     }
 }
