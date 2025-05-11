@@ -15,7 +15,11 @@ A modern, lightweight macOS system monitor built with SwiftUI.
 
 ## Screenshots
 
-> _Add screenshots here if you wish!_
+## Screenshots
+
+![Main Window](SCR-20250509-dges.png)
+![Settings Panel](SCR-20250509-dhok.png)
+
 
 ## Installation
 
