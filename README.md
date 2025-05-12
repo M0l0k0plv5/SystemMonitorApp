@@ -13,12 +13,6 @@ A modern, lightweight macOS system monitor built with SwiftUI.
 - **Appearance Settings:** Choose between Light, Dark, or Automatic (system) appearance.
 - **Clean UI:** Modern, rounded fonts and a translucent background.
 
-## Screenshots
-
-## Screenshots
-
-![Main Window]([SCR-20250509-dges.png]
-![Settings Panel](SCR-20250509-dhok.png)
 
 ## Installation
 
